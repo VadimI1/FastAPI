@@ -1,0 +1,73 @@
+# docker-compose.yml
+
+version: '3.9'
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-file: '10'
+    max-size: 200k
+
+services:
+  app:
+    build:
+      context: .
+    container_name: fastapi
+    restart: always
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+#    external_links:
+#      - db-pg:db-pg
+#    volumes:
+#      - .:/app
+    env_file:
+      - src/.env
+    command: ["sh", "app.sh"]
+
+  db:
+    image: postgres:15
+    container_name: db_pg
+#    volumes:
+#      - postgres_data:/var/lib/postgresql/data/
+#    environment:
+#      - POSTGRES_USER=postgres
+#      - POSTGRES_PASSWORD=admin
+#      - POSTGRES_DB=mem
+    command: -p 5432
+    expose:
+      - 5432
+    env_file:
+      - src/.env
+
+  minio:
+    image: quay.io/minio/minio:RELEASE.2023-06-09T07-32-12Z
+    container_name: s3minio
+    command: server /data --console-address "minio:9090"
+    restart: always
+    ports:
+      - 9090:9090
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio-data:/data
+      - minio-events-queue:/opt/minio/events
+    logging: *logging
+
+  pytest:
+    build:
+      context: ./
+      dockerfile: Dockerfile_pytest
+    container_name: pytest
+    volumes:
+      - ./src/tests/test:/src/tests/
+    tty: true
+
+volumes:
+  minio-data:
+  minio-events-queue:
+  postgres_data:
+
+
